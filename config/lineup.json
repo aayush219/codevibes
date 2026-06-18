@@ -1,0 +1,16 @@
+{
+  "_comment": "Pick 3-6 format IDs from config/formats.py FORMATS dict. Order = posting order.",
+  "lineup": ["challenge", "vibe", "oneliner", "beginner", "wouldyourather"],
+  "page_handle": "code_vibes.dev",
+  "timezone": "Australia/Sydney",
+  "posting_times": {
+    "challenge": "09:00",
+    "vibe": "12:00",
+    "oneliner": "17:00",
+    "beginner": "19:00",
+    "wouldyourather": "21:00",
+    "mindblown": "15:00",
+    "tierlist": "18:00",
+    "devmath": "11:00"
+  }
+}

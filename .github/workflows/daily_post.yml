@@ -1,0 +1,189 @@
+name: CodeVibes Daily Posts
+
+# HOW THIS WORKS:
+# Each format has its own job that triggers at a specific UTC cron time.
+# GitHub Actions cron is always UTC. Adjust the times below to match your
+# timezone. See SETUP.md for a Sydney/AEST conversion table.
+#
+# Current config (Sydney AEST = UTC+10, AEDT = UTC+11):
+#   09:00 AEDT = 22:00 UTC → Challenge
+#   12:00 AEDT = 01:00 UTC → Vibe
+#   17:00 AEDT = 06:00 UTC → One Liner
+#   19:00 AEDT = 08:00 UTC → Beginner
+#   21:00 AEDT = 10:00 UTC → Would You Rather
+
+on:
+  schedule:
+    - cron: "0 22 * * *"   # 09:00 AEDT → Challenge
+    - cron: "0 1  * * *"   # 12:00 AEDT → Vibe
+    - cron: "0 6  * * *"   # 17:00 AEDT → One Liner
+    - cron: "0 8  * * *"   # 19:00 AEDT → Beginner
+    - cron: "0 10 * * *"   # 21:00 AEDT → Would You Rather
+
+  workflow_dispatch:
+    inputs:
+      format:
+        description: "Format to post (challenge/vibe/oneliner/beginner/wouldyourather/mindblown/tierlist/devmath)"
+        required: true
+        default: "challenge"
+      dry_run:
+        description: "true = generate + render only, no Instagram post"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  # ── SCHEDULED POSTS ─────────────────────────────────────────────
+  # Each job checks the current UTC hour to determine if it should run.
+  # This is the reliable way to map cron times to specific formats.
+
+  post-challenge:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && (github.event.schedule == '0 22 * * *')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get install -y -qq fonts-noto-color-emoji
+      - run: pip install -r requirements.txt
+      - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
+      - name: Post Challenge
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        run: python scripts/run_daily.py --format challenge --repo-full-name ${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: challenge-${{ github.run_id }}
+          path: output/*.png
+          retention-days: 14
+
+  post-vibe:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && (github.event.schedule == '0 1 * * *')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get install -y -qq fonts-noto-color-emoji
+      - run: pip install -r requirements.txt
+      - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
+      - name: Post Vibe
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        run: python scripts/run_daily.py --format vibe --repo-full-name ${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vibe-${{ github.run_id }}
+          path: output/*.png
+          retention-days: 14
+
+  post-oneliner:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && (github.event.schedule == '0 6 * * *')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get install -y -qq fonts-noto-color-emoji
+      - run: pip install -r requirements.txt
+      - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
+      - name: Post One Liner
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        run: python scripts/run_daily.py --format oneliner --repo-full-name ${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oneliner-${{ github.run_id }}
+          path: output/*.png
+          retention-days: 14
+
+  post-beginner:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && (github.event.schedule == '0 8 * * *')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get install -y -qq fonts-noto-color-emoji
+      - run: pip install -r requirements.txt
+      - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
+      - name: Post Beginner Corner
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        run: python scripts/run_daily.py --format beginner --repo-full-name ${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: beginner-${{ github.run_id }}
+          path: output/*.png
+          retention-days: 14
+
+  post-wouldyourather:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && (github.event.schedule == '0 10 * * *')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get install -y -qq fonts-noto-color-emoji
+      - run: pip install -r requirements.txt
+      - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
+      - name: Post Would You Rather
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        run: python scripts/run_daily.py --format wouldyourather --repo-full-name ${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wouldyourather-${{ github.run_id }}
+          path: output/*.png
+          retention-days: 14
+
+  # ── MANUAL / ON-DEMAND ──────────────────────────────────────────
+  post-manual:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get install -y -qq fonts-noto-color-emoji
+      - run: pip install -r requirements.txt
+      - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
+      - name: Run selected format
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          python scripts/run_daily.py \
+            --format ${{ github.event.inputs.format }} \
+            --repo-full-name ${{ github.repository }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: manual-${{ github.event.inputs.format }}-${{ github.run_id }}
+          path: output/*.png
+          retention-days: 14
