@@ -1,20 +1,3 @@
-"""
-CodeVibes Studio — Instagram Poster
-Publishes a single image + caption to Instagram using the Instagram Graph API.
-
-REQUIRES (see SETUP.md for full walkthrough):
-  - An Instagram Professional (Business or Creator) account
-  - That account linked to a Facebook Page
-  - A Meta app with the instagram_basic + instagram_content_publish permissions
-  - A long-lived Page Access Token
-  - Your Instagram Business Account ID (IG_USER_ID)
-  - A public HTTPS URL where the generated image can be fetched from
-    (the Graph API requires a URL, not a local file upload — see image_host.py)
-
-Usage:
-    python post_to_instagram.py --image path/to/image.png --caption "caption text" --image-url https://your-host/image.png
-"""
-
 import os
 import sys
 import time
@@ -29,97 +12,49 @@ GRAPH_BASE = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
 
 def get_credentials():
-    """Retrieve Instagram API credentials."""
-    # Temporary direct hardcoding to bypass terminal caching completely
     token = os.environ.get("IG_ACCESS_TOKEN")
     ig_user_id = os.environ.get("IG_USER_ID")
-    
+    if not token or not ig_user_id:
+        raise RuntimeError("Missing IG_ACCESS_TOKEN or IG_USER_ID environment variables.")
     return token, ig_user_id
 
 
 def create_media_container(image_url, caption, token, ig_user_id):
-    """Step 1: tell Instagram to fetch the image and prep a media container."""
+    """Step 1: Tell Instagram to fetch the image and prep a media container."""
     url = f"{GRAPH_BASE}/{ig_user_id}/media"
     payload = {
         "image_url": image_url,
         "caption": caption,
         "access_token": token,
     }
-    # FORCE RESTORE TO ORIGINAL WORKING FORMAT:
     resp = requests.post(url, data=payload, timeout=30)
-    
     resp.raise_for_status()
-    data = resp.json()
-    return data["id"]
+    return resp.json()["id"]
 
-
-def wait_for_container_ready(container_id, token, max_wait=90):
-    """Poll container status, catching Meta subcode 33 across all HTTP error codes."""
-    url = f"{GRAPH_BASE}/{container_id}"
-    waited = 0
-    
-    print("   ⏳ Giving Meta's database a 15s head start to index the container...")
-    time.sleep(15) 
-    
-    while waited < max_wait:
-        resp = requests.get(url, params={"fields": "status_code", "access_token": token}, timeout=15)
-        
-        # Parse JSON error payloads regardless of the HTTP status code (400, 404, etc.)
-        if resp.status_code != 200:
-            try:
-                err_data = resp.json().get("error", {})
-                if err_data.get("error_subcode") == 33 or "does not exist" in err_data.get("message", "").lower():
-                    print(f"   ⏳ Check at {waited}s: Meta object propagation delay detected. Retrying...")
-                    time.sleep(10)
-                    waited += 10
-                    continue
-            except Exception:
-                pass # Fallback to standard error raiser if JSON parsing fails
-                
-        resp.raise_for_status()
-        status = resp.json().get("status_code")
-        print(f"   ⏳ Check at {waited}s: Status is '{status}'")
-        
-        if status == "FINISHED":
-            return True
-        if status == "ERROR":
-            raise RuntimeError(f"Media container failed processing: {resp.json()}")
-            
-        time.sleep(10)
-        waited += 10
-        
-    raise TimeoutError(f"Container {container_id} not ready after {max_wait}s")
 
 def publish_container(container_id, token, ig_user_id):
-    """Step 2: actually publish the prepped container as a live post."""
+    """Step 2: Publish the prepped container as a live post."""
     url = f"{GRAPH_BASE}/{ig_user_id}/media_publish"
     payload = {"creation_id": container_id, "access_token": token}
-    
-    # FORCE RESTORE TO ORIGINAL WORKING FORMAT:
     resp = requests.post(url, data=payload, timeout=30)
-    
     resp.raise_for_status()
-    data = resp.json()
-    return data["id"]
+    return resp.json()["id"]
+
 
 def post_to_instagram(image_url, caption):
-    """
-    Full flow: create container -> wait for ready -> publish.
-    image_url MUST be a publicly accessible HTTPS URL (Instagram fetches it server-side).
-    Returns the published media ID.
-    """
+    """Full flow: creates the container, waits 10s for Meta's CDN ingestion, and publishes directly."""
     token, ig_user_id = get_credentials()
 
     print(f"📤 Creating media container for {image_url[:60]}...")
     container_id = create_media_container(image_url, caption, token, ig_user_id)
 
-    print(f"⏳ Waiting for Instagram to process the image...")
-    wait_for_container_ready(container_id, token)
+    print(f"⏳ Sleeping 10s to bypass Meta's container indexing bug...")
+    time.sleep(10)
 
-    print(f"🚀 Publishing...")
+    print(f"🚀 Publishing directly to feed...")
     media_id = publish_container(container_id, token, ig_user_id)
 
-    print(f"✅ Published! Media ID: {media_id}")
+    print(f"✅ Published successfully! Media ID: {media_id}")
     return media_id
 
 
