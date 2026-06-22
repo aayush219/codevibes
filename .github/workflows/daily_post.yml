@@ -171,6 +171,9 @@ jobs:
       - run: sudo apt-get install -y -qq fonts-noto-color-emoji
       - run: pip install -r requirements.txt
       - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
+      - name: Prep Local Output Directories
+        run: mkdir -p output
+
       - name: Run selected format
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
