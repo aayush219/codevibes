@@ -54,24 +54,27 @@ def create_media_container(image_url, caption, token, ig_user_id):
 
 
 def wait_for_container_ready(container_id, token, max_wait=90):
-    """Poll the container status until FINISHED, catching Meta's transient subcode 33 bug."""
+    """Poll container status, catching Meta subcode 33 across all HTTP error codes."""
     url = f"{GRAPH_BASE}/{container_id}"
     waited = 0
     
-    # 🛠️ Initial safety delay to give Meta's server a head start before the first check
+    print("   ⏳ Giving Meta's database a 15s head start to index the container...")
     time.sleep(15) 
     
     while waited < max_wait:
         resp = requests.get(url, params={"fields": "status_code", "access_token": token}, timeout=15)
         
-        # Check if Meta drops the transient propagation error code 100 subcode 33
-        if resp.status_code == 400:
-            err_data = resp.json().get("error", {})
-            if err_data.get("code") == 100 and err_data.get("error_subcode") == 33:
-                print(f"   ⏳ Check at {waited}s: Meta is indexing container node. Retrying...")
-                time.sleep(5)
-                waited += 5
-                continue
+        # Parse JSON error payloads regardless of the HTTP status code (400, 404, etc.)
+        if resp.status_code != 200:
+            try:
+                err_data = resp.json().get("error", {})
+                if err_data.get("error_subcode") == 33 or "does not exist" in err_data.get("message", "").lower():
+                    print(f"   ⏳ Check at {waited}s: Meta object propagation delay detected. Retrying...")
+                    time.sleep(10)
+                    waited += 10
+                    continue
+            except Exception:
+                pass # Fallback to standard error raiser if JSON parsing fails
                 
         resp.raise_for_status()
         status = resp.json().get("status_code")
@@ -82,8 +85,8 @@ def wait_for_container_ready(container_id, token, max_wait=90):
         if status == "ERROR":
             raise RuntimeError(f"Media container failed processing: {resp.json()}")
             
-        time.sleep(5)
-        waited += 5
+        time.sleep(10)
+        waited += 10
         
     raise TimeoutError(f"Container {container_id} not ready after {max_wait}s")
 
