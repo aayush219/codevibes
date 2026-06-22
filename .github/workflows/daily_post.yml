@@ -173,17 +173,21 @@ jobs:
       - run: git config user.name "CodeVibes Bot" && git config user.email "bot@codevibes"
       - name: Prep Local Output Directories
         run: mkdir -p output
-
       - name: Run selected format
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          PYTHONIOENCODING: "utf-8"
         run: |
+          # We force Python to use a stable synchronous selector loop wrapper before execution
+          python -c "import asyncio, sys; sys.platform == 'win32' or asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())"
+          
           python scripts/run_daily.py \
             --format ${{ github.event.inputs.format }} \
             --repo-full-name ${{ github.repository }}
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
