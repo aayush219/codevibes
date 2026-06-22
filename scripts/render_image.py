@@ -355,26 +355,64 @@ def render_challenge(post, handle, fmt_meta):
     draw_top_bar(img, draw, "challenge", handle, fmt_meta)
     mid = S // 2
 
+    # ── Titles
     title = post.get("title", "what does this output? 👇")
     f_title = F_BOLD(50)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.10), title, f_title, (255, 255, 255, 255))
-
+    tl_lines = wrap_mixed(title, f_title, cw * 0.88, draw)
+    ty = cy + int(ch * 0.09)
+    for tl in tl_lines:
+        draw_mixed_centered(img, draw, mid, ty, tl, f_title, (255, 255, 255, 255))
+        ty += 58
     sub = post.get("sub", "")
-    f_sub = F_BOLD(30)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.19), sub, f_sub, (*c1, 255))
+    f_sub = F_BOLD(29)
+    draw_mixed_centered(img, draw, mid, ty + 2, sub, f_sub, (*c1, 255))
+    header_bottom = ty + 44
 
-    code = post.get("code", "")
-    box = (cx + int(cw * 0.05), cy + int(ch * 0.27), int(cw * 0.9), int(ch * 0.46))
-    render_code_block(img, draw, code.split("\n"), box)
+    # ── Code block: size dynamically from line count
+    code_lines = [l for l in post.get("code", "").split("\n")]
+    CODE_LINE_H, DOT_H, PAD_TOP, PAD_BOT = 42, 50, 16, 16
+    block_h = DOT_H + PAD_TOP + len(code_lines) * CODE_LINE_H + PAD_BOT
+    # Clamp so it doesn't overflow into the CTA
+    CTA_H, CTA_GAP, BOTTOM_GAP = 80, 14, 12
+    max_block_h = (cy + ch) - header_bottom - CTA_H - CTA_GAP - BOTTOM_GAP - 8
+    if block_h > max_block_h:
+        block_h = max_block_h
 
-    ay = cy + int(ch * 0.82)
-    pill_w, pill_h = int(cw * 0.9), int(ch * 0.1)
-    pill = Image.new("RGBA", (pill_w, pill_h), (255, 255, 255, 10))
+    bx, bw = cx + int(cw * 0.04), int(cw * 0.92)
+    # Stretch block to fill available space (no dead gap)
+    stretch_h = (cy + ch) - header_bottom - CTA_H - CTA_GAP - BOTTOM_GAP - 8 - 8
+    block_h = max(block_h, stretch_h)
+    block_y = header_bottom + 8
+    blk = Image.new("RGBA", (bw, block_h), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(blk)
+    bd.rounded_rectangle([0, 0, bw-1, block_h-1], radius=20,
+                          fill=(0, 0, 0, 140), outline=(255, 255, 255, 16), width=2)
+    img.alpha_composite(blk, (bx, block_y))
+
+    dots = [(c1, (124,111,255)), ((245,158,11),(245,158,11)), ((16,185,129),(16,185,129))]
+    for i, (col, _) in enumerate(dots):
+        dx, dy = bx + 34 + i * 34, block_y + 26
+        draw.ellipse([dx-8, dy-8, dx+8, dy+8], fill=(*col, 255))
+
+    f_code = F_MONO(30)
+    yy = block_y + DOT_H + PAD_TOP
+    for line in code_lines:
+        if yy > block_y + block_h - PAD_BOT - 4:
+            break
+        col = syntax_color(line)
+        draw_mixed(img, draw, bx + 28, yy, line[:42], f_code, (*col, 255))
+        yy += CODE_LINE_H
+
+    # ── CTA pill anchored above bottom bar
+    cta_y = (cy + ch) - CTA_H - BOTTOM_GAP
+    pill = Image.new("RGBA", (bw, CTA_H), (0, 0, 0, 0))
     pd = ImageDraw.Draw(pill)
-    pd.rounded_rectangle([0, 0, pill_w - 1, pill_h - 1], radius=20, outline=(*c1, 90), width=2)
-    img.alpha_composite(pill, (cx + int(cw * 0.05), ay))
+    pd.rounded_rectangle([0, 0, bw-1, CTA_H-1], radius=22,
+                          fill=(255, 255, 255, 8), outline=(*c1, 100), width=2)
+    img.alpha_composite(pill, (bx, cta_y))
     f_ans = F_BOLD(26)
-    draw_mixed_centered(img, draw, mid, ay + pill_h // 2 - 16, "💬 comment your answer first 👇", f_ans, (*c2, 255))
+    draw_mixed_centered(img, draw, mid, cta_y + CTA_H//2 - 18,
+                        "💬 comment your answer first 👇", f_ans, (*c2, 255))
 
     draw_bottom_bar(img, draw, "challenge")
     return img
@@ -385,41 +423,103 @@ def render_vibe(post, handle, fmt_meta):
     draw_top_bar(img, draw, "vibe", handle, fmt_meta)
     mid = S // 2
 
-    draw_mixed_centered_block(img, draw, mid, cy + int(ch * 0.13), "💀", None, None, emoji_size=110)
+    # Big skull centered, with a subtle glow halo
+    skull_y = cy + int(ch * 0.09)
+    skull_size = 104
+    glow = ctx_glow = Image.new("RGBA", (skull_size + 40, skull_size + 40), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([0, 0, skull_size + 39, skull_size + 39], fill=(*c1, 22))
+    img.alpha_composite(glow, (mid - (skull_size + 40)//2, skull_y - 20))
+    draw_mixed_centered_block(img, draw, mid, skull_y, "💀", None, None, emoji_size=skull_size)
 
     title = post.get("title", "")
     f_title = F_BOLD(52)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.34), title, f_title, (255, 255, 255, 255))
+    t_lines = wrap_mixed(title, f_title, cw * 0.86, draw)
+    ty = skull_y + skull_size + 18
+    for tl in t_lines:
+        draw_mixed_centered(img, draw, mid, ty, tl, f_title, (255, 255, 255, 255))
+        ty += 60
 
     sub = post.get("sub", "")
-    f_sub = F_BOLD(30)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.44), sub, f_sub, (*c1, 255))
+    f_sub = F_BOLD(29)
+    draw_mixed_centered(img, draw, mid, ty + 4, sub, f_sub, (*c1, 255))
+    bubble_top = ty + 50
 
+    # ── Text bubble: left-aligned text for readability
     vlines = post.get("vibeLines", [])
-    vby, vbh = cy + int(ch * 0.51), int(ch * 0.32)
-    bubble_w = int(cw * 0.86)
-    bubble = Image.new("RGBA", (bubble_w, vbh), (0, 0, 0, 100))
+    LINE_H = 46
+    EMOJI_ROW_H = 70   # emoji row + bottom margin
+    max_bubble_h = (cy + ch) - bubble_top - EMOJI_ROW_H - 12
+    bubble_content_h = sum(LINE_H if l else 22 for l in vlines)
+    # Stretch to fill available space — no dead gap
+    bubble_h = max(bubble_content_h + 32, max_bubble_h)
+    bubble_h = min(bubble_h, max_bubble_h)
+    bubble_w = int(cw * 0.88)
+
+    bubble = Image.new("RGBA", (bubble_w, bubble_h), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bubble)
-    bd.rounded_rectangle([0, 0, bubble_w - 1, vbh - 1], radius=24, outline=(255, 255, 255, 14), width=2)
-    img.alpha_composite(bubble, (cx + int(cw * 0.07), vby))
+    bd.rounded_rectangle([0, 0, bubble_w-1, bubble_h-1], radius=20,
+                          fill=(0, 0, 0, 100), outline=(255, 255, 255, 12), width=1)
+    img.alpha_composite(bubble, (cx + int(cw * 0.06), bubble_top))
 
     f_v = F_MONO(30)
-    yy = vby + 28
+    # Left-align inside bubble for better code/text readability
+    text_lx = cx + int(cw * 0.06) + 24
+    yy = bubble_top + 16
     for line in vlines:
+        if yy > bubble_top + bubble_h - 12:
+            break
         if line == "":
-            yy += 30
+            yy += 22
             continue
-        col = c1 if line.startswith("...") else (196, 192, 255)
-        draw_mixed_centered(img, draw, mid, yy, line, f_v, (*col, 255))
-        yy += 44
+        col = c1 if line.startswith("...") else (210, 206, 255)
+        draw_mixed(img, draw, text_lx, yy, line, f_v, (*col, 255))
+        yy += LINE_H
 
+    # ── Reaction emojis row — anchored 14px above bottom bar
     emojis = ["😭", "😂", "💀", "🫠"]
-    start_x = mid - (len(emojis) * 88) // 2
+    emoji_y = (cy + ch) - 58
+    ex = mid - (len(emojis) * 86) // 2
     for i, e in enumerate(emojis):
-        draw_mixed_centered_block(img, draw, start_x + i * 88 + 25, cy + int(ch * 0.88), e, None, None, emoji_size=46)
+        draw_mixed_centered_block(img, draw, ex + i * 86 + 30, emoji_y, e, None, None, emoji_size=44)
 
     draw_bottom_bar(img, draw, "vibe")
     return img
+
+
+def _wrap_code_line(line, max_chars=38):
+    """Wrap a long code line at natural break points (spaces/operators)."""
+    if len(line) <= max_chars:
+        return [line]
+    leading = len(line) - len(line.lstrip())
+    cont_indent = " " * (leading + 2)
+    BREAK_CHARS = [" ", ",", ".", "(", "[", "+", "|", "="]
+    result = []
+    current = line
+    while len(current) > max_chars:
+        budget = max_chars if not result else max(20, max_chars - len(cont_indent))
+        segment = current[:budget]
+        best_break = -1
+        for ch in BREAK_CHARS:
+            pos = segment.rfind(ch)
+            if pos > max(5, len(cont_indent) + 4):
+                best_break = max(best_break, pos + (1 if ch == " " else 0))
+        if best_break > 0:
+            result.append(current[:best_break])
+            current = cont_indent + current[best_break:].lstrip(" ")
+        else:
+            result.append(current[:budget])
+            current = cont_indent + current[budget:]
+    if current:
+        result.append(current)
+    return result
+
+
+def _expand_code_lines(raw_code, max_chars=38):
+    result = []
+    for line in raw_code.split("\n"):
+        result.extend(_wrap_code_line(line, max_chars))
+    return result
 
 
 def render_oneliner(post, handle, fmt_meta):
@@ -427,57 +527,89 @@ def render_oneliner(post, handle, fmt_meta):
     draw_top_bar(img, draw, "oneliner", handle, fmt_meta)
     mid = S // 2
 
+    # ── Header
     title = post.get("title", "stop writing 8 lines")
-    f_title = F_BOLD(46)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.08), title, f_title, (255, 255, 255, 255))
-
+    f_title = F_BOLD(44)
+    tl_lines = wrap_mixed(title, f_title, cw * 0.88, draw)
+    ty = cy + int(ch * 0.07)
+    for tl in tl_lines:
+        draw_mixed_centered(img, draw, mid, ty, tl, f_title, (255, 255, 255, 255))
+        ty += 54
     sub = post.get("sub", "")
-    f_sub = F_BOLD(28)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.17), sub, f_sub, (*c1, 255))
+    f_sub = F_BOLD(27)
+    draw_mixed_centered(img, draw, mid, ty + 4, sub, f_sub, (*c1, 255))
+    header_bottom = ty + 44
 
-    before, after = post.get("before", ""), post.get("after", "")
+    # ── Measure both code blocks
+    before_raw = post.get("before", "")
+    after_raw  = post.get("after", "")
+    before_lines = _expand_code_lines(before_raw, 38)
+    after_lines  = _expand_code_lines(after_raw,  38)
 
-    bx, bw = cx + int(cw * 0.04), int(cw * 0.92)
-    before_y, before_h = cy + int(ch * 0.23), int(ch * 0.32)
-    block1 = Image.new("RGBA", (bw, before_h), (0, 0, 0, 130))
-    bd1 = ImageDraw.Draw(block1)
-    bd1.rounded_rectangle([0, 0, bw - 1, before_h - 1], radius=20, outline=(255, 255, 255, 16), width=2)
-    img.alpha_composite(block1, (bx, before_y))
-    draw_mixed(img, draw, bx + 26, before_y + 18, "😩 before", F_BOLD(24), (140, 140, 170, 255))
-    f_code = F_MONO(28)
-    yy = before_y + 60
-    for line in before.split("\n"):
-        if yy > before_y + before_h - 24:
+    LABEL_H, CODE_H, PAD = 44, 34, 14
+    ARROW_H, LANG_H = 52, 56
+    BMARGIN = 12
+
+    before_h = LABEL_H + len(before_lines) * CODE_H + PAD
+    after_h  = LABEL_H + len(after_lines)  * CODE_H + PAD
+    available = (cy + ch) - header_bottom - ARROW_H - LANG_H - BMARGIN - 16
+    total = before_h + after_h
+    if total > available:
+        ratio = available / total
+        before_h = max(80, int(before_h * ratio))
+        after_h  = max(60, int(after_h  * ratio))
+        CODE_H   = max(26, int(CODE_H * ratio))
+
+    bx = cx + int(cw * 0.04)
+    bw = int(cw * 0.92)
+
+    # ── Before block
+    before_y = header_bottom + 8
+    blk1 = Image.new("RGBA", (bw, before_h), (0, 0, 0, 0))
+    bd1  = ImageDraw.Draw(blk1)
+    bd1.rounded_rectangle([0, 0, bw-1, before_h-1], radius=18,
+                           fill=(0, 0, 0, 130), outline=(255, 255, 255, 14), width=1)
+    img.alpha_composite(blk1, (bx, before_y))
+    draw_mixed(img, draw, bx + 24, before_y + 14, "😩 before", F_BOLD(22), (130, 130, 165, 255))
+    f_code = F_MONO(26)
+    yy = before_y + LABEL_H
+    for line in before_lines:
+        if yy > before_y + before_h - 8:
             break
-        draw_mixed(img, draw, bx + 26, yy, line[:44], f_code, (138, 138, 170, 255))
-        yy += 38
+        draw_mixed(img, draw, bx + 24, yy, line, f_code, (130, 130, 165, 255))
+        yy += CODE_H
 
-    arrow_y = before_y + before_h + 8
-    draw_mixed_centered_block(img, draw, mid, arrow_y, "⬇️", None, None, emoji_size=46)
+    # ── Arrow
+    arrow_y = before_y + before_h + 6
+    draw_mixed_centered_block(img, draw, mid, arrow_y + 2, "⬇️", None, None, emoji_size=38)
 
-    after_y, after_h = arrow_y + 56, int(ch * 0.20)
-    block2 = Image.new("RGBA", (bw, after_h), (0, 0, 0, 0))
-    bd2 = ImageDraw.Draw(block2)
-    bd2.rounded_rectangle([0, 0, bw - 1, after_h - 1], radius=20, fill=(*c1, 24), outline=(*c1, 140), width=2)
-    img.alpha_composite(block2, (bx, after_y))
-    draw_mixed(img, draw, bx + 26, after_y + 16, "✨ after", F_BOLD(24), (*c1, 255))
-    yy = after_y + 56
-    for line in after.split("\n"):
-        if yy > after_y + after_h - 20:
+    # ── After block
+    after_y = arrow_y + ARROW_H
+    blk2 = Image.new("RGBA", (bw, after_h), (0, 0, 0, 0))
+    bd2  = ImageDraw.Draw(blk2)
+    bd2.rounded_rectangle([0, 0, bw-1, after_h-1], radius=18,
+                           fill=(*c1, 20), outline=(*c1, 160), width=2)
+    img.alpha_composite(blk2, (bx, after_y))
+    draw_mixed(img, draw, bx + 24, after_y + 14, "✨ after", F_BOLD(22), (*c1, 255))
+    yy = after_y + LABEL_H
+    for line in after_lines:
+        if yy > after_y + after_h - 8:
             break
-        draw_mixed(img, draw, bx + 26, yy, line[:44], f_code, (224, 222, 255, 255))
-        yy += 38
+        draw_mixed(img, draw, bx + 24, yy, line, f_code, (224, 222, 255, 255))
+        yy += CODE_H
 
-    lang = post.get("lang", "JavaScript")
-    f_lang = F_MONO_BOLD(24)
-    bbox = draw.textbbox((0, 0), lang, font=f_lang)
-    lw = bbox[2] - bbox[0]
-    lang_y = cy + int(ch * 0.91)
-    pill = Image.new("RGBA", (lw + 50, 50), (0, 0, 0, 0))
+    # ── Lang badge
+    lang = post.get("lang", "Python")
+    f_lang = F_MONO_BOLD(23)
+    bbox  = draw.textbbox((0, 0), lang, font=f_lang)
+    lw    = bbox[2] - bbox[0]
+    lang_y = after_y + after_h + 14
+    pw, ph = lw + 50, 44
+    pill = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
     pd = ImageDraw.Draw(pill)
-    pd.rounded_rectangle([0, 0, lw + 49, 49], radius=25, fill=(*c1, 40))
-    img.alpha_composite(pill, (mid - (lw + 50) // 2, lang_y))
-    draw.text((mid - lw // 2, lang_y + 13), lang, font=f_lang, fill=(*c1, 255))
+    pd.rounded_rectangle([0, 0, pw-1, ph-1], radius=22, fill=(*c1, 40))
+    img.alpha_composite(pill, (mid - pw//2, lang_y))
+    draw.text((mid - lw//2, lang_y + 10), lang, font=f_lang, fill=(*c1, 255))
 
     draw_bottom_bar(img, draw, "oneliner")
     return img
@@ -488,47 +620,71 @@ def render_wouldyourather(post, handle, fmt_meta):
     draw_top_bar(img, draw, "wouldyourather", handle, fmt_meta)
     mid = S // 2
 
+    # ── Header label
     f_h = F_BOLD(28)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.08), "WOULD YOU RATHER…", f_h, (*c1, 255))
+    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.07), "WOULD YOU RATHER…", f_h, (*c1, 255))
 
     optA = post.get("optionA", {"emoji": "😭", "text": "Option A"})
     optB = post.get("optionB", {"emoji": "💀", "text": "Option B"})
 
+    # ── Fixed layout constants so both boxes are equal height
+    VS_D    = 88        # VS circle diameter
+    CTXT_H  = 50        # height for context text at bottom
+    GAP_TOP = 12        # gap between header and option A
+    GAP_VS  = 10        # gap between option A and VS
+    GAP_B   = 10        # gap between VS and option B
+    GAP_CTX = 8         # gap between option B and context
+
+    available = (cy + ch) - (cy + int(ch * 0.07) + 36) - GAP_TOP - VS_D - GAP_VS - GAP_B - GAP_CTX - CTXT_H - 16
+    opt_h = available // 2  # both options same height
+
+    # Clamp to sensible min/max
+    opt_h = max(180, min(opt_h, 260))
+
+    EMOJI_SZ = min(74, opt_h // 2)
+    ow = int(cw * 0.92)
+    ox = cx + int(cw * 0.04)
+
+    optA_y = cy + int(ch * 0.07) + 40 + GAP_TOP
+
     def draw_option(opt, oy, color):
-        ox, ow, oh = cx + int(cw * 0.04), int(cw * 0.92), int(ch * 0.28)
-        box = Image.new("RGBA", (ow, oh), (*color, 30))
-        bd = ImageDraw.Draw(box)
-        bd.rounded_rectangle([0, 0, ow - 1, oh - 1], radius=28, outline=(*color, 110), width=3)
+        box = Image.new("RGBA", (ow, opt_h), (0, 0, 0, 0))
+        bd  = ImageDraw.Draw(box)
+        bd.rounded_rectangle([0, 0, ow-1, opt_h-1], radius=22,
+                               fill=(*color, 28), outline=(*color, 130), width=2)
         img.alpha_composite(box, (ox, oy))
-
-        draw_mixed_centered_block(img, draw, mid, oy + int(oh * 0.12), opt.get("emoji", "🤔"), None, None, emoji_size=84)
-
-        f_txt = F_BOLD(30)
-        wrapped = wrap_mixed(opt.get("text", ""), f_txt, ow * 0.78, draw)
-        ty = oy + int(oh * 0.62)
+        # Emoji vertically centered in top half
+        emoji_center_y = oy + opt_h // 4
+        draw_mixed_centered_block(img, draw, mid, emoji_center_y - EMOJI_SZ//2,
+                                  opt.get("emoji", "🤔"), None, None, emoji_size=EMOJI_SZ)
+        # Text vertically centered in bottom half
+        f_txt = F_BOLD(29)
+        wrapped = wrap_mixed(opt.get("text", ""), f_txt, ow * 0.80, draw)
+        total_th = len(wrapped) * 38
+        ty = oy + opt_h // 2 + (opt_h // 2 - total_th) // 2
         for wl in wrapped:
             draw_mixed_centered(img, draw, mid, ty, wl, f_txt, (255, 255, 255, 255))
-            ty += 40
+            ty += 38
 
-    optA_y = cy + int(ch * 0.16)
     draw_option(optA, optA_y, c1)
 
-    vs_y = optA_y + int(ch * 0.28) + 14
-    vs_size = 100
-    vs_circle = Image.new("RGBA", (vs_size, vs_size), (0, 0, 0, 0))
+    vs_y = optA_y + opt_h + GAP_VS
+    vs_circle = Image.new("RGBA", (VS_D, VS_D), (0, 0, 0, 0))
     vd = ImageDraw.Draw(vs_circle)
-    vd.ellipse([0, 0, vs_size - 1, vs_size - 1], fill=(30, 28, 45, 230), outline=(*c1, 200), width=3)
-    img.alpha_composite(vs_circle, (mid - vs_size // 2, vs_y))
-    f_vs = F_BOLD(36)
+    vd.ellipse([0, 0, VS_D-1, VS_D-1], fill=(22, 20, 38, 235), outline=(*c1, 210), width=3)
+    img.alpha_composite(vs_circle, (mid - VS_D//2, vs_y))
+    f_vs = F_BOLD(34)
     bbox = draw.textbbox((0, 0), "VS", font=f_vs)
-    draw.text((mid - (bbox[2] - bbox[0]) // 2, vs_y + vs_size // 2 - 22), "VS", font=f_vs, fill=(255, 255, 255, 255))
+    draw.text((mid - (bbox[2]-bbox[0])//2, vs_y + VS_D//2 - (bbox[3]-bbox[1])//2 - 2),
+              "VS", font=f_vs, fill=(255, 255, 255, 255))
 
-    optB_y = vs_y + 100 + 14
+    optB_y = vs_y + VS_D + GAP_B
     draw_option(optB, optB_y, c2)
 
     context = post.get("context", "comment A or B 👇")
-    f_ctx = F_REGULAR(26)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.945), context, f_ctx, (110, 110, 140, 255))
+    f_ctx = F_REGULAR(25)
+    ctx_y = optB_y + opt_h + GAP_CTX
+    draw_mixed_centered(img, draw, mid, ctx_y + 8, context, f_ctx, (120, 118, 148, 255))
 
     draw_bottom_bar(img, draw, "wouldyourather")
     return img
@@ -539,56 +695,69 @@ def render_beginner(post, handle, fmt_meta):
     draw_top_bar(img, draw, "beginner", handle, fmt_meta)
     mid = S // 2
 
-    f_h = F_BOLD(28)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.07), "🔰  BEGINNER CORNER", f_h, (*c1, 255))
+    # ── Header section
+    f_h = F_BOLD(27)
+    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.06), "🔰  BEGINNER CORNER", f_h, (*c1, 255))
 
     title = post.get("title", "")
-    f_title = F_BOLD(46)
-    wrapped = wrap_mixed(title, f_title, cw * 0.8, draw)
-    ty = cy + int(ch * 0.15)
-    for wl in wrapped:
-        draw_mixed_centered(img, draw, mid, ty, wl, f_title, (255, 255, 255, 255))
-        ty += 56
+    f_title = F_BOLD(44)
+    t_wrapped = wrap_mixed(title, f_title, cw * 0.84, draw)
+    ty = cy + int(ch * 0.13)
+    for tl in t_wrapped:
+        draw_mixed_centered(img, draw, mid, ty, tl, f_title, (255, 255, 255, 255))
+        ty += 54
 
     sub = post.get("sub", "")
-    f_sub = F_BOLD(28)
-    draw_mixed_centered(img, draw, mid, ty + 6, sub, f_sub, (*c2, 255))
+    f_sub = F_BOLD(27)
+    draw_mixed_centered(img, draw, mid, ty + 4, sub, f_sub, (*c2, 255))
+    analogy_top = ty + 50
 
+    # ── Analogy pill
     analogy = post.get("analogy", "")
-    apy, apw = ty + 60, int(cw * 0.82)
-    apill = Image.new("RGBA", (apw, 64), (0, 0, 0, 0))
+    apw = int(cw * 0.86)
+    aph = 58
+    apill = Image.new("RGBA", (apw, aph), (0, 0, 0, 0))
     ad = ImageDraw.Draw(apill)
-    ad.rounded_rectangle([0, 0, apw - 1, 63], radius=20, fill=(*c1, 28), outline=(*c1, 90), width=2)
-    img.alpha_composite(apill, (mid - apw // 2, apy))
-    f_an = F_BOLD(26)
-    draw_mixed_centered(img, draw, mid, apy + 18, analogy, f_an, (*c1, 255))
+    ad.rounded_rectangle([0, 0, apw-1, aph-1], radius=20,
+                          fill=(*c1, 25), outline=(*c1, 100), width=2)
+    img.alpha_composite(apill, (mid - apw//2, analogy_top))
+    f_an = F_BOLD(25)
+    draw_mixed_centered(img, draw, mid, analogy_top + aph//2 - 16, analogy, f_an, (*c1, 255))
 
+    # ── Steps: distribute evenly in remaining space
     steps = post.get("steps", [])
-    sy = apy + 100
-    f_num, f_step = F_BOLD(26), F_REGULAR(26)
-    text_x = cx + int(cw * 0.1) + 46
-    max_text_w = cx + cw - text_x - 30
-    line_h = 34
+    steps_top = analogy_top + aph + 16
+    steps_bottom = (cy + ch) - 14  # right to the bottom of card
+    available_h = steps_bottom - steps_top
+    step_slot = available_h // max(len(steps), 1) if steps else 72
+    step_slot = max(56, min(step_slot, 90))
+
+    f_num  = F_BOLD(24)
+    f_step = F_REGULAR(25)
+    text_x = cx + int(cw * 0.1) + 44
+    max_tw = cx + cw - text_x - 28
 
     for i, step in enumerate(steps):
-        if sy > cy + int(ch * 0.91):
+        sy = steps_top + i * step_slot + step_slot // 2
+        if sy > steps_bottom - 16:
             break
-        circle_x = cx + int(cw * 0.1)
-        circle_d = 48
-        circle_img = Image.new("RGBA", (circle_d, circle_d), (0, 0, 0, 0))
-        circ_d = ImageDraw.Draw(circle_img)
-        circ_d.ellipse([0, 0, circle_d - 1, circle_d - 1], fill=(*c2, 60), outline=(*c2, 180), width=2)
-        img.alpha_composite(circle_img, (circle_x - circle_d // 2, sy - circle_d // 2))
+
+        circ_x = cx + int(cw * 0.1)
+        CIRC = 46
+        circle_img = Image.new("RGBA", (CIRC, CIRC), (0, 0, 0, 0))
+        cd = ImageDraw.Draw(circle_img)
+        cd.ellipse([0, 0, CIRC-1, CIRC-1], fill=(*c2, 55), outline=(*c2, 180), width=2)
+        img.alpha_composite(circle_img, (circ_x - CIRC//2, sy - CIRC//2))
         num_text = str(i + 1)
         bbox = draw.textbbox((0, 0), num_text, font=f_num)
-        draw.text((circle_x - (bbox[2] - bbox[0]) // 2, sy - (bbox[3] - bbox[1]) // 2 - 3),
+        draw.text((circ_x - (bbox[2]-bbox[0])//2, sy - (bbox[3]-bbox[1])//2 - 2),
                    num_text, font=f_num, fill=(*c2, 255))
-        wrapped = wrap_mixed(step, f_step, max_text_w, draw)
-        block_h = len(wrapped) * line_h
+
+        wrapped_step = wrap_mixed(step, f_step, max_tw, draw)
+        block_h = len(wrapped_step) * 32
         text_top = sy - block_h // 2
-        for j, line in enumerate(wrapped):
-            draw_mixed(img, draw, text_x, text_top + j * line_h, line, f_step, (224, 222, 255, 255))
-        sy += max(70, block_h + 16)
+        for j, line in enumerate(wrapped_step):
+            draw_mixed(img, draw, text_x, text_top + j * 32, line, f_step, (224, 222, 255, 255))
 
     draw_bottom_bar(img, draw, "beginner")
     return img
@@ -599,39 +768,68 @@ def render_mindblown(post, handle, fmt_meta):
     draw_top_bar(img, draw, "mindblown", handle, fmt_meta)
     mid = S // 2
 
-    draw_mixed_centered_block(img, draw, mid, cy + int(ch * 0.13), "🤯", None, None, emoji_size=110)
-
-    f_label = F_BOLD(28)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.31), "MIND = BLOWN", f_label, (*c1, 255))
-
-    fact = post.get("fact", "")
+    # Pre-measure to centre content vertically in the card
     f_fact = F_BOLD(38)
-    wrapped = wrap_mixed(fact, f_fact, cw * 0.84, draw)
-    fy = cy + int(ch * 0.40)
-    for wl in wrapped:
-        draw_mixed_centered(img, draw, mid, fy, wl, f_fact, (255, 255, 255, 255))
-        fy += 50
+    f_fu   = F_REGULAR(26)
+    f_dp   = F_REGULAR(24)
 
+    fact     = post.get("fact", "")
     followup = post.get("followup", "")
-    f_fu = F_REGULAR(27)
-    wrapped2 = wrap_mixed(followup, f_fu, cw * 0.78, draw)
-    fy += 16
-    for wl in wrapped2:
-        draw_mixed_centered(img, draw, mid, fy, wl, f_fu, (140, 140, 176, 255))
-        fy += 38
+    deeper   = post.get("deeper", "")
 
-    deeper = post.get("deeper", "")
-    f_dp = F_REGULAR(25)
-    draw_mixed_centered(img, draw, mid, fy + 16, deeper, f_dp, (*c2, 255))
+    fact_lines = wrap_mixed(fact, f_fact, cw * 0.86, draw)
+    fu_lines   = wrap_mixed(followup, f_fu, cw * 0.80, draw)
+    dp_lines   = wrap_mixed(deeper, f_dp, cw * 0.78, draw)
 
-    cta_y = cy + int(ch * 0.85)
-    cta_w, cta_h = int(cw * 0.8), 60
-    cta = Image.new("RGBA", (cta_w, cta_h), (0, 0, 0, 0))
-    cd = ImageDraw.Draw(cta)
-    cd.rounded_rectangle([0, 0, cta_w - 1, cta_h - 1], radius=18, fill=(*c1, 50))
-    img.alpha_composite(cta, (cx + int(cw * 0.1), cta_y))
-    f_cta = F_BOLD(25)
-    draw_mixed_centered(img, draw, mid, cta_y + 17, "share with someone 👇", f_cta, (*c1, 255))
+    EMOJI_H  = 96
+    LABEL_H  = 30
+    CTA_H    = 56
+
+    # Measure total content height
+    total_h = (EMOJI_H + 10 + LABEL_H + 14
+               + len(fact_lines) * 50
+               + 16 + len(fu_lines) * 34
+               + 12 + len(dp_lines) * 30
+               + 24 + CTA_H)
+
+    # Vertically centre with 40% top bias
+    start_y = cy + int((ch - total_h) * 0.40)
+    start_y = max(cy + 14, start_y)
+
+    y = start_y
+    draw_mixed_centered_block(img, draw, mid, y, "🤯", None, None, emoji_size=EMOJI_H)
+    y += EMOJI_H + 10
+
+    f_label = F_BOLD(26)
+    draw_mixed_centered(img, draw, mid, y, "MIND = BLOWN", f_label, (*c1, 255))
+    y += LABEL_H + 14
+
+    for wl in fact_lines:
+        draw_mixed_centered(img, draw, mid, y, wl, f_fact, (255, 255, 255, 255))
+        y += 50
+
+    y += 16
+    for wl in fu_lines:
+        draw_mixed_centered(img, draw, mid, y, wl, f_fu, (145, 143, 180, 255))
+        y += 34
+
+    y += 12
+    for wl in dp_lines:
+        draw_mixed_centered(img, draw, mid, y, wl, f_dp, (*c2, 255))
+        y += 30
+
+    # CTA immediately below content
+    cta_y = y + 24
+    cta_y = min(cta_y, (cy + ch) - CTA_H - 16)
+    CTA_W = int(cw * 0.82)
+    cta = Image.new("RGBA", (CTA_W, CTA_H), (0, 0, 0, 0))
+    cd  = ImageDraw.Draw(cta)
+    cd.rounded_rectangle([0, 0, CTA_W-1, CTA_H-1], radius=20,
+                          fill=(*c1, 45), outline=(*c1, 130), width=1)
+    img.alpha_composite(cta, (mid - CTA_W//2, cta_y))
+    f_cta = F_BOLD(24)
+    draw_mixed_centered(img, draw, mid, cta_y + CTA_H//2 - 16,
+                        "share with someone 👇", f_cta, (*c1, 255))
 
     draw_bottom_bar(img, draw, "mindblown")
     return img
@@ -642,33 +840,65 @@ def render_tierlist(post, handle, fmt_meta):
     draw_top_bar(img, draw, "tierlist", handle, fmt_meta)
     mid = S // 2
 
-    f_h = F_BOLD(28)
+    # ── Header
+    f_h = F_BOLD(27)
     draw_mixed_centered(img, draw, mid, cy + int(ch * 0.06), "🏆 TIER LIST", f_h, (*c1, 255))
 
     topic = post.get("topic", "")
-    f_topic = F_BOLD(42)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.13), topic, f_topic, (255, 255, 255, 255))
+    f_topic = F_BOLD(40)
+    t_lines = wrap_mixed(topic, f_topic, cw * 0.88, draw)
+    ty = cy + int(ch * 0.13)
+    for tl in t_lines:
+        draw_mixed_centered(img, draw, mid, ty, tl, f_topic, (255, 255, 255, 255))
+        ty += 48
+    rows_top = ty + 10
 
+    # ── Rows: dynamically sized to fill card
     tiers = post.get("tiers", {})
-    ty, row_h = cy + int(ch * 0.23), int(ch * 0.12)
-    f_tier, f_item = F_BOLD(38), F_REGULAR(27)
+    n = len(tiers)
+    FOOTER_H = 48
+    rows_bottom = (cy + ch) - FOOTER_H - 8
+    available_h = rows_bottom - rows_top
+    # Stretch to fill all space — no unused gap
+    row_slot = available_h // n if n else 80
+    row_slot = max(62, row_slot)
+    GAP = 6
+    row_h = row_slot - GAP
 
-    for tier_label, items in tiers.items():
-        col = TIER_COLORS.get(tier_label, c1)
-        row_w, row_h2 = int(cw * 0.94), int(row_h * 0.85)
-        row = Image.new("RGBA", (row_w, row_h2), (*col, 35))
-        rd = ImageDraw.Draw(row)
-        rd.rounded_rectangle([0, 0, row_w - 1, row_h2 - 1], radius=16, outline=(*col, 90), width=2)
-        img.alpha_composite(row, (cx + int(cw * 0.03), ty))
+    f_tier = F_BOLD(36)
+    f_item = F_REGULAR(26)
 
-        draw.text((cx + int(cw * 0.03) + 30, ty + row_h2 // 2 - 24), tier_label, font=f_tier, fill=(*col, 255))
+    for i, (tier_label, items) in enumerate(tiers.items()):
+        col  = TIER_COLORS.get(tier_label, c1)
+        rw   = int(cw * 0.92)
+        ry   = rows_top + i * row_slot
+        # Draw row with proper rounded corners using composited layer
+        row_img = Image.new("RGBA", (rw, row_h), (0, 0, 0, 0))
+        rd = ImageDraw.Draw(row_img)
+        rd.rounded_rectangle([0, 0, rw-1, row_h-1], radius=14,
+                               fill=(*col, 32), outline=(*col, 100), width=2)
+        img.alpha_composite(row_img, (cx + int(cw * 0.04), ry))
+
+        # Tier letter
+        bbox = draw.textbbox((0, 0), tier_label, font=f_tier)
+        lh = bbox[3] - bbox[1]
+        draw.text((cx + int(cw * 0.04) + 22, ry + row_h//2 - lh//2 - 2),
+                   tier_label, font=f_tier, fill=(*col, 255))
+
+        # Items text with separator dots
         items_text = "  ·  ".join(items)
-        draw.text((cx + int(cw * 0.03) + 110, ty + row_h2 // 2 - 16), items_text[:38], font=f_item, fill=(224, 222, 255, 255))
+        # Truncate to fit — use wrap then take first line
+        it_lines = wrap_mixed(items_text, f_item, rw - 110, draw)
+        it_text  = it_lines[0] if it_lines else items_text
+        bbox2 = draw.textbbox((0, 0), it_text, font=f_item)
+        ih = bbox2[3] - bbox2[1]
+        draw.text((cx + int(cw * 0.04) + 90, ry + row_h//2 - ih//2 - 2),
+                   it_text, font=f_item, fill=(224, 222, 255, 255))
 
-        ty += row_h
-
-    f_f = F_REGULAR(25)
-    draw_mixed_centered(img, draw, mid, cy + int(ch * 0.93), "drop your tier list 👇 let's fight", f_f, (110, 110, 140, 255))
+    # ── Footer
+    f_f = F_REGULAR(24)
+    draw_mixed_centered(img, draw, mid, rows_bottom + 12,
+                        "drop your tier list 👇 let's fight", f_f, (110, 110, 145, 255))
 
     draw_bottom_bar(img, draw, "tierlist")
     return img
@@ -679,31 +909,49 @@ def render_devmath(post, handle, fmt_meta):
     draw_top_bar(img, draw, "devmath", handle, fmt_meta)
     mid = S // 2
 
-    f_h = F_BOLD(28)
+    # ── Header
+    f_h = F_BOLD(27)
     draw_mixed_centered(img, draw, mid, cy + int(ch * 0.06), "💸 DEV MATH", f_h, (*c1, 255))
 
-    f_title = F_BOLD(36)
-    for i, line in enumerate(["math they don't teach", "in CS class 📐"]):
-        draw_mixed_centered(img, draw, mid, cy + int(ch * 0.14) + i * 46, line, f_title, (255, 255, 255, 255))
+    f_title = F_BOLD(34)
+    header_lines = ["math they don't teach", "in CS class 📐"]
+    hy = cy + int(ch * 0.13)
+    for hl in header_lines:
+        draw_mixed_centered(img, draw, mid, hy, hl, f_title, (255, 255, 255, 255))
+        hy += 44
+    rows_top = hy + 14
 
+    # ── Equation rows: evenly distributed in remaining space
     equations = post.get("equations", [])
-    ey, row_h = cy + int(ch * 0.32), int(ch * 0.155)
-    f_eq = F_MONO_BOLD(28)
+    n = len(equations)
+    BMARGIN = 14
+    rows_bottom = (cy + ch) - BMARGIN
+    available_h = rows_bottom - rows_top
+    # Stretch rows to fill all available space
+    row_slot = available_h // n if n else 80
+    row_slot = max(72, row_slot)  # no cap — fill the space
+    GAP = 8
+    row_h = row_slot - GAP
+
+    f_eq = F_MONO_BOLD(27)
     for i, eq in enumerate(equations):
-        col = c1 if i % 2 == 0 else c2
-        box_w, box_h = int(cw * 0.9), int(row_h * 0.82)
-        box = Image.new("RGBA", (box_w, box_h), (255, 255, 255, 10 if i % 2 == 0 else 6))
-        bd = ImageDraw.Draw(box)
-        bd.rounded_rectangle([0, 0, box_w - 1, box_h - 1], radius=16, outline=(*col, 50), width=2)
-        img.alpha_composite(box, (cx + int(cw * 0.05), ey))
+        col  = c1 if i % 2 == 0 else c2
+        rw   = int(cw * 0.90)
+        ry   = rows_top + i * row_slot
 
-        wrapped = wrap_mixed(eq, f_eq, cw * 0.78, draw)
-        ty = ey + box_h // 2 - (len(wrapped) * 36) // 2
-        for wl in wrapped:
-            draw_mixed_centered(img, draw, mid, ty, wl, f_eq, (224, 222, 255, 255))
-            ty += 36
+        row_img = Image.new("RGBA", (rw, row_h), (0, 0, 0, 0))
+        rd = ImageDraw.Draw(row_img)
+        rd.rounded_rectangle([0, 0, rw-1, row_h-1], radius=14,
+                               fill=(255, 255, 255, 8 if i % 2 == 0 else 4),
+                               outline=(*col, 55), width=2)
+        img.alpha_composite(row_img, (cx + int(cw * 0.05), ry))
 
-        ey += row_h
+        eq_lines = wrap_mixed(eq, f_eq, rw * 0.88, draw)
+        total_h  = len(eq_lines) * 34
+        eqy = ry + row_h//2 - total_h//2
+        for wl in eq_lines:
+            draw_mixed_centered(img, draw, mid, eqy, wl, f_eq, (224, 222, 255, 255))
+            eqy += 34
 
     draw_bottom_bar(img, draw, "devmath")
     return img
