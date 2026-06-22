@@ -53,24 +53,38 @@ def create_media_container(image_url, caption, token, ig_user_id):
     return data["id"]
 
 
-def wait_for_container_ready(container_id, token, max_wait=60):
-    """Poll the container status until FINISHED (Instagram needs to fetch+process the image)."""
+def wait_for_container_ready(container_id, token, max_wait=90):
+    """Poll the container status until FINISHED, catching Meta's transient subcode 33 bug."""
     url = f"{GRAPH_BASE}/{container_id}"
     waited = 0
+    
+    # 🛠️ Initial safety delay to give Meta's server a head start before the first check
+    time.sleep(15) 
+    
     while waited < max_wait:
         resp = requests.get(url, params={"fields": "status_code", "access_token": token}, timeout=15)
+        
+        # Check if Meta drops the transient propagation error code 100 subcode 33
+        if resp.status_code == 400:
+            err_data = resp.json().get("error", {})
+            if err_data.get("code") == 100 and err_data.get("error_subcode") == 33:
+                print(f"   ⏳ Check at {waited}s: Meta is indexing container node. Retrying...")
+                time.sleep(5)
+                waited += 5
+                continue
+                
         resp.raise_for_status()
         status = resp.json().get("status_code")
-        
-        # ADDED FOR DEBUGGING: Let us see the current status live!
         print(f"   ⏳ Check at {waited}s: Status is '{status}'")
         
         if status == "FINISHED":
             return True
         if status == "ERROR":
             raise RuntimeError(f"Media container failed processing: {resp.json()}")
-        time.sleep(3)
-        waited += 3
+            
+        time.sleep(5)
+        waited += 5
+        
     raise TimeoutError(f"Container {container_id} not ready after {max_wait}s")
 
 def publish_container(container_id, token, ig_user_id):
