@@ -181,7 +181,10 @@ jobs:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
           PYTHONIOENCODING: "utf-8"
         run: |
-          # We force Python to use a stable synchronous selector loop wrapper before execution
+          # Clean out old cached runtime assets to force a fresh AI generation
+          rm -rf output/
+          mkdir -p output
+          
           python -c "import asyncio, sys; sys.platform == 'win32' or asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())"
           
           python scripts/run_daily.py \
