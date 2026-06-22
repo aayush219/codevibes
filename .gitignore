@@ -1,5 +1,6 @@
 .env
-output/*.png
+output/*
+!output/.gitkeep
 output/content_today.json
 __pycache__/
 *.pyc
