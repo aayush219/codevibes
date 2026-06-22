@@ -28,17 +28,21 @@ def get_client():
     if not api_key:
         raise RuntimeError(
             "ANTHROPIC_API_KEY environment variable not set. "
-            "See SETUP.md for how to configure it (.env locally, or )."
+            "See SETUP.md for how to configure it (.env locally, or GitHub Secrets in Actions)."
         )
     
-    # We use an explicit HTTPX client configuration to bypass datacenter blocking filters
     import httpx
+    
+    # Configure an advanced browser-mimicking transport layer
+    limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
     custom_client = httpx.Client(
         headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept-Encoding": "gzip, deflate, br"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
         },
-        timeout=60.0,
+        timeout=90.0,
+        limits=limits,
         follow_redirects=True
     )
     
