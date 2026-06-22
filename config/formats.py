@@ -1,3 +1,32 @@
+
+# ===============================
+# VIRAL GROWTH LAYER V2
+# ===============================
+
+GLOBAL_CONTENT_RULES = """
+Maximize shares, saves, comments and follows.
+
+Before generating content:
+- Prefer trending AI topics when relevant
+- Use one hook style: Shock, Contrarian, Challenge, Prediction, Comparison, Hot Take
+- Use one emotional trigger: Curiosity, Surprise, FOMO, Debate, Identity
+- Reject generic content
+"""
+
+TRENDING_TOPICS = [
+    "GPT-5","Claude","Claude Code","Cursor AI","DeepSeek",
+    "AI Agents","Agentic AI","MCP","LangGraph","CrewAI",
+    "RAG","Fine Tuning","Local LLMs","Vibe Coding"
+]
+
+COMMENT_CTA = [
+    "agree or disagree?",
+    "drop your answer below",
+    "save this for later",
+    "send this to a Python friend",
+    "which side are you on?"
+]
+
 """
 CodeVibes Studio — Post Format Definitions (Python / ML / AI edition)
 
@@ -296,3 +325,52 @@ Return ONLY valid JSON (no markdown fences):
 }
 
 DEFAULT_LINEUP = ["challenge", "vibe", "oneliner", "beginner", "wouldyourather"]
+
+
+# ===============================
+# NEW VIRAL FORMATS
+# ===============================
+
+FORMATS["ainews"] = {
+    "emoji": "🚨",
+    "label": "AI News",
+    "tag": "TRENDING",
+    "desc": "Major AI news simplified",
+    "default_time": "08:00",
+    "recommended": True,
+}
+
+FORMATS["hottake"] = {
+    "emoji": "🔥",
+    "label": "Hot Take",
+    "tag": "DEBATE",
+    "desc": "Controversial AI/Python opinions",
+    "default_time": "20:00",
+    "recommended": True,
+}
+
+FORMATS["toolbattle"] = {
+    "emoji": "⚔️",
+    "label": "Tool Battle",
+    "tag": "VS",
+    "desc": "Compare popular AI tools",
+    "default_time": "16:00",
+    "recommended": True,
+}
+
+FORMATS["career"] = {
+    "emoji": "📈",
+    "label": "Career Reality",
+    "tag": "CAREER",
+    "desc": "AI and Python career advice",
+    "default_time": "18:00",
+    "recommended": True,
+}
+
+DEFAULT_LINEUP = [
+    "ainews",
+    "challenge",
+    "hottake",
+    "oneliner",
+    "wouldyourather"
+]
