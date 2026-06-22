@@ -86,7 +86,7 @@ def run_one_format(format_id, handle, client, dry_run, repo_full_name, today_str
     if pushed:
         print("  ⏳ Waiting 10s for GitHub raw CDN to catch up...")
         import time
-        time.sleep(10)
+        time.sleep(90)
 
     # 4. Post to Instagram
     print("📤 Posting to Instagram...")
