@@ -565,23 +565,30 @@ def render_beginner(post, handle, fmt_meta):
 
     steps = post.get("steps", [])
     sy = apy + 100
-    f_num, f_step = F_BOLD(26), F_REGULAR(27)
+    f_num, f_step = F_BOLD(26), F_REGULAR(26)
+    text_x = cx + int(cw * 0.1) + 46
+    max_text_w = cx + cw - text_x - 30
+    line_h = 34
+
     for i, step in enumerate(steps):
-        if sy > cy + int(ch * 0.92):
+        if sy > cy + int(ch * 0.91):
             break
         circle_x = cx + int(cw * 0.1)
-        circle_d = 52
+        circle_d = 48
         circle_img = Image.new("RGBA", (circle_d, circle_d), (0, 0, 0, 0))
         circ_d = ImageDraw.Draw(circle_img)
         circ_d.ellipse([0, 0, circle_d - 1, circle_d - 1], fill=(*c2, 60), outline=(*c2, 180), width=2)
         img.alpha_composite(circle_img, (circle_x - circle_d // 2, sy - circle_d // 2))
         num_text = str(i + 1)
         bbox = draw.textbbox((0, 0), num_text, font=f_num)
-        draw.text((circle_x - (bbox[2] - bbox[0]) // 2, sy - (bbox[3] - bbox[1]) // 2 - 4),
+        draw.text((circle_x - (bbox[2] - bbox[0]) // 2, sy - (bbox[3] - bbox[1]) // 2 - 3),
                    num_text, font=f_num, fill=(*c2, 255))
-        step_text = step if len(step) <= 46 else step[:46].rsplit(" ", 1)[0]
-        draw_mixed(img, draw, circle_x + 50, sy - 16, step_text, f_step, (224, 222, 255, 255))
-        sy += 76
+        wrapped = wrap_mixed(step, f_step, max_text_w, draw)
+        block_h = len(wrapped) * line_h
+        text_top = sy - block_h // 2
+        for j, line in enumerate(wrapped):
+            draw_mixed(img, draw, text_x, text_top + j * line_h, line, f_step, (224, 222, 255, 255))
+        sy += max(70, block_h + 16)
 
     draw_bottom_bar(img, draw, "beginner")
     return img
