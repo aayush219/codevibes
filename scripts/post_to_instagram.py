@@ -5,6 +5,7 @@ import argparse
 import requests
 
 from dotenv import load_dotenv, find_dotenv
+# Force load the .env file and override any cached terminal session variables
 load_dotenv(find_dotenv(), override=True)
 
 GRAPH_API_VERSION = "v21.0"
@@ -15,8 +16,12 @@ def get_credentials():
     token = os.environ.get("IG_ACCESS_TOKEN")
     ig_user_id = os.environ.get("IG_USER_ID")
     if not token or not ig_user_id:
-        raise RuntimeError("Missing IG_ACCESS_TOKEN or IG_USER_ID environment variables.")
+        raise RuntimeError(
+            "Missing IG_ACCESS_TOKEN or IG_USER_ID environment variables. "
+            "Check that your .env file exists in your main project folder."
+        )
     return token, ig_user_id
+
 
 
 def create_media_container(image_url, caption, token, ig_user_id):
@@ -27,29 +32,44 @@ def create_media_container(image_url, caption, token, ig_user_id):
         "caption": caption,
         "access_token": token,
     }
+    # Restored to the original working POST structure
     resp = requests.post(url, data=payload, timeout=30)
+    
+    if resp.status_code != 200:
+        print("\n❌ Meta Container Creation Failed!")
+        print("Response Details:", resp.text)
+        
     resp.raise_for_status()
     return resp.json()["id"]
 
 
 def publish_container(container_id, token, ig_user_id):
-    """Step 2: Publish the prepped container as a live post."""
+    """Step 2: Actually publish the prepped container as a live post."""
     url = f"{GRAPH_BASE}/{ig_user_id}/media_publish"
-    payload = {"creation_id": container_id, "access_token": token}
+    payload = {
+        "creation_id": container_id,
+        "access_token": token
+    }
     resp = requests.post(url, data=payload, timeout=30)
+    
+    if resp.status_code != 200:
+        print("\n❌ Meta Publishing Failed!")
+        print("Response Details:", resp.text)
+        
     resp.raise_for_status()
     return resp.json()["id"]
 
 
 def post_to_instagram(image_url, caption):
-    """Full flow: creates the container, waits 10s for Meta's CDN ingestion, and publishes directly."""
+    """Full pipeline flow: create container, wait, and publish directly."""
     token, ig_user_id = get_credentials()
 
     print(f"📤 Creating media container for {image_url[:60]}...")
     container_id = create_media_container(image_url, caption, token, ig_user_id)
 
-    print(f"⏳ Sleeping 10s to bypass Meta's container indexing bug...")
-    time.sleep(10)
+    # 15s pause completely bypasses Meta's broken status-tracking loop endpoint bug
+    print(f"⏳ Sleeping 15s to let Meta ingest the image completely...")
+    time.sleep(15)
 
     print(f"🚀 Publishing directly to feed...")
     media_id = publish_container(container_id, token, ig_user_id)
